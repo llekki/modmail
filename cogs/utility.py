@@ -78,13 +78,24 @@ class ModmailHelpCommand(commands.HelpCommand):
     def process_help_msg(self, help_: str):
         return help_.format(prefix=self.clean_prefix) if help_ else "No help message."
 
-    async def send_bot_help(self, mapping):
+    async def send_bot_help(self, cogs):
         embeds = []
         # TODO: Implement for no cog commands
-        for cog in sorted(
-            (key for key in mapping.keys() if key is not None),
-            key=lambda c: c.qualified_name,
-        ):
+
+        cogs = list(filter(None, cogs))
+
+        bot = self.context.bot
+        
+        # always come first
+        default_cogs = [ 
+            bot.get_cog("Modmail"),
+            bot.get_cog("Utility"),
+            bot.get_cog("Plugins"),
+        ]
+        
+        default_cogs.extend(c for c in cogs if c not in default_cogs)
+
+        for cog in default_cogs:
             embeds.extend(await self.format_cog_help(cog))
 
         p_session = PaginatorSession(
@@ -285,9 +296,12 @@ class Utility(commands.Cog):
     async def debug(self, ctx):
         """Shows the recent application-logs of the bot."""
 
+        log_file_name = self.bot.config.token.split(".")[0]
+
         with open(
             os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "../temp/logs.log"
+                os.path.dirname(os.path.abspath(__file__)),
+                f"../temp/{log_file_name}.log",
             ),
             "r+",
         ) as f:
@@ -338,10 +352,12 @@ class Utility(commands.Cog):
         """Posts application-logs to Hastebin."""
 
         haste_url = os.environ.get("HASTE_URL", "https://hasteb.in")
+        log_file_name = self.bot.config.token.split(".")[0]
 
         with open(
             os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "../temp/logs.log"
+                os.path.dirname(os.path.abspath(__file__)),
+                f"../temp/{log_file_name}.log",
             ),
             "r+",
         ) as f:
@@ -372,9 +388,13 @@ class Utility(commands.Cog):
     @trigger_typing
     async def debug_clear(self, ctx):
         """Clears the locally cached logs."""
+
+        log_file_name = self.bot.config.token.split(".")[0]
+
         with open(
             os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "../temp/logs.log"
+                os.path.dirname(os.path.abspath(__file__)),
+                f"../temp/{log_file_name}.log",
             ),
             "w",
         ):
@@ -1356,9 +1376,11 @@ class Utility(commands.Cog):
         embed = Embed(color=self.bot.main_color)
         embed.title = "Success"
 
-        if not hasattr(target, 'mention'):
-            target = self.bot.get_user(target.id) or self.bot.modmail_guild.get_role(target.id)
-            
+        if not hasattr(target, "mention"):
+            target = self.bot.get_user(target.id) or self.bot.modmail_guild.get_role(
+                target.id
+            )
+
         embed.description = (
             f"{'Un-w' if removed else 'W'}hitelisted " f"{target.mention} to view logs."
         )
